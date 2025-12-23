@@ -32,7 +32,7 @@ async function loadPlaylistFromDB() {
     };
 }
 
-// 3. 保存処理（MP3/動画をそのまま保存）
+// 3. 保存処理（メッセージを「完了！」に限定）
 document.getElementById('videoInput').onchange = (e) => {
     document.getElementById('convertBtn').disabled = !e.target.files[0];
 };
@@ -52,13 +52,13 @@ document.getElementById('convertBtn').onclick = () => {
     const addRequest = store.add({ name: songName, data: file });
 
     addRequest.onsuccess = () => {
-        status.textContent = "ファイル追加完了！";
+        status.textContent = "完了！"; // シンプルに変更
         document.getElementById('convertBtn').disabled = false;
         loadPlaylistFromDB();
     };
 };
 
-// 4. プレイリスト表示
+// 4. プレイリスト表示（名変ボタンあり）
 function renderPlaylist() {
     const list = document.getElementById('playlist');
     list.innerHTML = '';
@@ -69,7 +69,8 @@ function renderPlaylist() {
             <div class="track-info" onclick="playTrack(${i})">
                 <span class="track-name">${track.name}</span>
             </div>
-            <div class="track-actions">
+            <div class="track-actions" style="display:flex; gap:10px;">
+                <button class="delete-btn" style="color:#1DB954; font-size:0.7rem;" onclick="renameTrack(${track.id})">名変</button>
                 <button class="delete-btn" onclick="deleteTrack(${track.id})">削除</button>
             </div>
         `;
@@ -77,7 +78,7 @@ function renderPlaylist() {
     });
 }
 
-// 5. 再生処理（テロップ更新）
+// 5. 再生処理
 function playTrack(index) {
     if (index < 0 || index >= playlist.length) return;
     currentIndex = index;
@@ -93,7 +94,21 @@ function playTrack(index) {
     renderPlaylist();
 }
 
-// 6. 操作制御
+// 6. 操作制御（名変・削除）
+function renameTrack(id) {
+    const newName = prompt("新しい曲名を入力してください");
+    if (!newName) return;
+    const transaction = db.transaction(["songs"], "readwrite");
+    const store = transaction.objectStore("songs");
+    const req = store.get(id);
+    req.onsuccess = () => {
+        const data = req.result;
+        data.name = newName;
+        store.put(data);
+    };
+    transaction.oncomplete = () => loadPlaylistFromDB();
+}
+
 function deleteTrack(id) {
     if (!confirm("ライブラリから削除しますか？")) return;
     const transaction = db.transaction(["songs"], "readwrite");
@@ -118,7 +133,6 @@ document.getElementById('prevBtn').onclick = () => {
     playTrack(prev);
 };
 
-// シャッフルボタンのON/OFF切り替え
 document.getElementById('shuffleBtn').onclick = (e) => {
     isShuffle = !isShuffle;
     e.target.textContent = isShuffle ? 'SHUFFLE ON' : 'SHUFFLE OFF';

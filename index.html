@@ -30,7 +30,7 @@
         #convertBtn:disabled { background: #444; color: #888; }
         #status { font-size: 0.85rem; color: #aaa; margin-top: 10px; text-align: center; }
 
-        /* プレーヤーエリア */
+        /* プレーヤーカード */
         .player-card { 
             background: linear-gradient(180deg, #282828 0%, #121212 100%);
             padding: 20px; border-radius: 15px; margin-bottom: 20px;
@@ -38,23 +38,33 @@
         }
         audio { width: 100%; margin-bottom: 15px; filter: invert(100%) hue-rotate(180deg) brightness(1.5); }
         
+        /* ◀︎◀︎ ▶︎▶︎ ボタンのエリア */
         .controls-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         .controls-grid button { 
             background: #333; color: white; border: none; padding: 12px; 
-            border-radius: 8px; font-size: 0.9rem; font-weight: bold;
+            border-radius: 8px; font-size: 1.1rem; font-weight: bold;
         }
         #nowPlaying { font-size: 0.9rem; text-align: center; color: #1DB954; min-height: 1.2rem; }
 
-        /* プレイリストエリア */
+        /* プレイリスト表示 */
         .playlist-header { border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 25px; font-size: 1.1rem; }
         #playlist { margin-top: 10px; }
+        
         .track-item { 
-            padding: 15px; border-bottom: 1px solid #222; 
+            padding: 12px 15px; border-bottom: 1px solid #222; 
             display: flex; justify-content: space-between; align-items: center;
         }
-        .track-item:active { background: #282828; }
         .track-item.active { background: #282828; border-left: 4px solid #1DB954; color: #1DB954; font-weight: bold; }
-        .track-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+        
+        .track-info { flex: 1; overflow: hidden; margin-right: 10px; }
+        .track-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; }
+        
+        .track-actions { display: flex; gap: 8px; }
+        .edit-btn, .delete-btn { 
+            background: #333; color: #ccc; border: 1px solid #444; 
+            padding: 6px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: bold;
+        }
+        .delete-btn { color: #ff4444; border-color: #552222; }
     </style>
 </head>
 <body>
@@ -70,9 +80,9 @@
         <div class="player-card">
             <audio id="mainAudio" controls></audio>
             <div class="controls-grid">
-                <button id="prevBtn">⏮ 前へ</button>
-                <button id="nextBtn">次へ ⏭</button>
-                <button id="shuffleBtn">シャッフル: OFF</button>
+                <button id="prevBtn">◀︎◀︎</button>
+                <button id="nextBtn">▶︎▶︎</button>
+                <button id="shuffleBtn" style="font-size: 0.8rem;">シャッフルOFF</button>
             </div>
             <p id="nowPlaying">再生中: なし</p>
         </div>

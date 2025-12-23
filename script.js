@@ -19,29 +19,39 @@ request.onsuccess = (e) => {
     loadPlaylistFromDB(); // 起動時に保存された曲を読み込む
 };
 
-// --- 2. データベースから曲を読み込む ---
+// --- 2. データの読み込み ---
 async function loadPlaylistFromDB() {
     const transaction = db.transaction(["songs"], "readonly");
     const store = transaction.objectStore("songs");
     const request = store.getAll();
     request.onsuccess = () => {
+        // メモリ管理のため、古いURLを解放
+        playlist.forEach(track => {
+            if (track.url) URL.revokeObjectURL(track.url);
+        });
+        
         playlist = request.result.map(song => ({
             id: song.id,
             name: song.name,
-            url: URL.createObjectURL(song.data) // 保存されたデータを再生用URLに変換
+            url: URL.createObjectURL(song.data) // 保存データを再生可能なURLに変換
         }));
         renderPlaylist();
     };
 }
 
 // --- 3. 変換と保存 ---
+document.getElementById('videoInput').onchange = (e) => {
+    document.getElementById('convertBtn').disabled = !e.target.files[0];
+};
+
 document.getElementById('convertBtn').onclick = async () => {
     const file = document.getElementById('videoInput').files[0];
     if (!file) return;
 
-    document.getElementById('status').textContent = "スマホで変換中...（少し時間がかかります）";
-    if (!ffmpeg.isLoaded()) await ffmpeg.load();
+    document.getElementById('status').textContent = "変換中...（スマホは時間がかかります）";
+    document.getElementById('convertBtn').disabled = true;
 
+    if (!ffmpeg.isLoaded()) await ffmpeg.load();
     ffmpeg.FS('writeFile', 'in.mp4', await fetchFile(file));
     await ffmpeg.run('-i', 'in.mp4', 'out.mp3');
     const data = ffmpeg.FS('readFile', 'out.mp3');
@@ -50,54 +60,94 @@ document.getElementById('convertBtn').onclick = async () => {
     // データベースに保存
     const transaction = db.transaction(["songs"], "readwrite");
     const store = transaction.objectStore("songs");
-    const songName = file.name.replace(/\.[^/.]+$/, ""); // .mp4を消す
+    const songName = file.name.replace(/\.[^/.]+$/, ""); // 初期値から.mp4を消す
     store.add({ name: songName, data: mp3Blob });
 
     transaction.oncomplete = () => {
-        loadPlaylistFromDB(); // 保存が終わったらリストを更新
+        loadPlaylistFromDB();
         document.getElementById('status').textContent = "保存完了！";
+        document.getElementById('convertBtn').disabled = false;
     };
 };
 
-// --- 4. 再生機能 & スマホのロック画面連携 ---
-function playTrack(index) {
-    if (index < 0 || index >= playlist.length) return;
-    currentIndex = index;
-    const track = playlist[index];
-    audio.src = track.url;
-    audio.play();
-
-    // ロック画面に情報を出す（Media Session API）
-    if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-            title: track.name,
-            artist: "My Music Player"
-        });
-    }
-    renderPlaylist();
-}
-
+// --- 4. プレイリスト表示 ---
 function renderPlaylist() {
     const list = document.getElementById('playlist');
     list.innerHTML = '';
     playlist.forEach((track, i) => {
         const item = document.createElement('div');
         item.className = `track-item ${i === currentIndex ? 'active' : ''}`;
-        item.innerHTML = `<div>${track.name}</div>`;
-        item.onclick = () => playTrack(i);
+        item.innerHTML = `
+            <div class="track-info" onclick="playTrack(${i})">
+                <span class="track-name">${track.name}</span>
+            </div>
+            <div class="track-actions">
+                <button class="edit-btn" onclick="renameTrack(${track.id})">名変</button>
+                <button class="delete-btn" onclick="deleteTrack(${track.id})">削除</button>
+            </div>
+        `;
         list.appendChild(item);
     });
 }
 
-// 自動再生
+// --- 5. 各種アクション (再生・名変・削除) ---
+function playTrack(index) {
+    if (index < 0 || index >= playlist.length) return;
+    currentIndex = index;
+    audio.src = playlist[index].url;
+    audio.play();
+    document.getElementById('nowPlaying').textContent = `再生中: ${playlist[index].name}`;
+    
+    // スマホのロック画面連携
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: playlist[index].name });
+    }
+    renderPlaylist();
+}
+
+function renameTrack(id) {
+    const newName = prompt("新しい曲名を入力してください");
+    if (!newName) return;
+    const transaction = db.transaction(["songs"], "readwrite");
+    const store = transaction.objectStore("songs");
+    const req = store.get(id);
+    req.onsuccess = () => {
+        const data = req.result;
+        data.name = newName;
+        store.put(data); // 変更後の名前を保存 [cite: 2025-12-22]
+    };
+    transaction.oncomplete = () => loadPlaylistFromDB();
+}
+
+function deleteTrack(id) {
+    if (!confirm("ライブラリから削除しますか？")) return;
+    const transaction = db.transaction(["songs"], "readwrite");
+    const store = transaction.objectStore("songs");
+    store.delete(id); // データを削除 [cite: 2025-12-22]
+    transaction.oncomplete = () => {
+        if (currentIndex !== -1 && playlist[currentIndex]?.id === id) {
+            audio.pause();
+            document.getElementById('nowPlaying').textContent = "再生中: なし";
+        }
+        loadPlaylistFromDB();
+    };
+}
+
+// --- 6. プレーヤー制御 (連続再生・ボタン) ---
 audio.onended = () => {
     let next = isShuffle ? Math.floor(Math.random() * playlist.length) : (currentIndex + 1) % playlist.length;
     playTrack(next);
 };
 
-// ボタン操作
 document.getElementById('nextBtn').onclick = () => audio.onended();
+
+document.getElementById('prevBtn').onclick = () => {
+    let prev = (currentIndex - 1 + playlist.length) % playlist.length;
+    playTrack(prev);
+};
+
 document.getElementById('shuffleBtn').onclick = (e) => {
     isShuffle = !isShuffle;
-    e.target.textContent = `シャッフル: ${isShuffle ? 'ON' : 'OFF'}`;
+    // シンプルな文字表示に変更
+    e.target.textContent = `シャッフル ${isShuffle ? 'ON' : 'OFF'}`;
 };

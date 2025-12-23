@@ -32,7 +32,7 @@ async function loadPlaylistFromDB() {
     };
 }
 
-// --- 3. 保存処理（最短ルート版） ---
+// --- 3. 保存処理（MP3/動画 両対応・爆速） ---
 document.getElementById('videoInput').onchange = (e) => {
     document.getElementById('convertBtn').disabled = !e.target.files[0];
 };
@@ -42,7 +42,7 @@ document.getElementById('convertBtn').onclick = () => {
     if (!file) return;
 
     const status = document.getElementById('status');
-    status.textContent = "保存中...";
+    status.textContent = "ライブラリに追加中...";
     document.getElementById('convertBtn').disabled = true;
 
     const transaction = db.transaction(["songs"], "readwrite");
@@ -78,16 +78,17 @@ function renderPlaylist() {
     });
 }
 
-// --- 5. 再生処理（テロップ演出付き） ---
+// --- 5. 再生処理（テロップ連動） ---
 function playTrack(index) {
     if (index < 0 || index >= playlist.length) return;
     currentIndex = index;
     audio.src = playlist[index].url;
     audio.play().catch(e => console.error(e));
 
-    // ★テロップ（流れる文字）の演出
+    // ★テロップの更新
     const nowPlaying = document.getElementById('nowPlaying');
-    nowPlaying.innerHTML = `<div class="marquee"><span>再生中: ${playlist[index].name}</span></div>`;
+    // 一度アニメーションをリセットして再適用するために、中身を書き換える
+    nowPlaying.textContent = `再生中: ${playlist[index].name}`;
     
     if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({ title: playlist[index].name });

@@ -2,97 +2,78 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>My Mobile Music Player</title>
-    <script src="coi-serviceworker.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Music Player</title>
     <style>
-        /* スマホ向けUIデザイン */
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: #121212; color: #ffffff; margin: 0; padding: 15px;
-            -webkit-tap-highlight-color: transparent;
+        body { font-family: sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        .player-container { width: 100%; max-width: 400px; text-align: center; }
+        
+        /* テロップの設定 */
+        .marquee-container {
+            width: 100%;
+            overflow: hidden;
+            background: #222;
+            padding: 10px 0;
+            margin: 10px 0;
+            border-radius: 8px;
+            height: 24px;
         }
-        .container { max-width: 600px; margin: 0 auto; }
-        h1 { font-size: 1.4rem; text-align: center; color: #1DB954; margin-bottom: 20px; }
+        .marquee {
+            display: inline-block;
+            white-space: nowrap;
+            padding-left: 100%;
+            animation: scroll-text 15s linear infinite;
+        }
+        @keyframes scroll-text {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-200%); }
+        }
 
-        /* アップロードエリア */
-        .upload-section {
-            background: #1e1e1e; padding: 15px; border-radius: 12px; margin-bottom: 20px;
-            border: 1px dashed #444; text-align: center;
-        }
-        input[type="file"] { width: 100%; margin-bottom: 10px; color: #ccc; }
+        audio { width: 100%; margin: 20px 0; }
+        .controls, .extra-controls { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }
+        button { background: #333; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        button:active { background: #555; }
         
-        #convertBtn { 
-            width: 100%; background: #1DB954; color: white; border: none; 
-            padding: 14px; border-radius: 30px; font-weight: bold; font-size: 1rem;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-        #convertBtn:disabled { background: #444; color: #888; }
-        #status { font-size: 0.85rem; color: #aaa; margin-top: 10px; text-align: center; }
-
-        /* プレーヤーカード */
-        .player-card { 
-            background: linear-gradient(180deg, #282828 0%, #121212 100%);
-            padding: 20px; border-radius: 15px; margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        audio { width: 100%; margin-bottom: 15px; filter: invert(100%) hue-rotate(180deg) brightness(1.5); }
+        .playlist { width: 100%; max-width: 400px; text-align: left; background: #1e1e1e; border-radius: 10px; padding: 10px; }
+        .track-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #333; }
+        .track-item.active { background: #333; color: #1db954; }
+        .track-info { flex: 1; cursor: pointer; }
+        .delete-btn { color: #ff4444; background: none; padding: 5px; }
         
-        /* ◀︎◀︎ ▶︎▶︎ ボタンのエリア */
-        .controls-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .controls-grid button { 
-            background: #333; color: white; border: none; padding: 12px; 
-            border-radius: 8px; font-size: 1.1rem; font-weight: bold;
-        }
-        #nowPlaying { font-size: 0.9rem; text-align: center; color: #1DB954; min-height: 1.2rem; }
-
-        /* プレイリスト表示 */
-        .playlist-header { border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 25px; font-size: 1.1rem; }
-        #playlist { margin-top: 10px; }
-        
-        .track-item { 
-            padding: 12px 15px; border-bottom: 1px solid #222; 
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .track-item.active { background: #282828; border-left: 4px solid #1DB954; color: #1DB954; font-weight: bold; }
-        
-        .track-info { flex: 1; overflow: hidden; margin-right: 10px; }
-        .track-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; }
-        
-        .track-actions { display: flex; gap: 8px; }
-        .edit-btn, .delete-btn { 
-            background: #333; color: #ccc; border: 1px solid #444; 
-            padding: 6px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: bold;
-        }
-        .delete-btn { color: #ff4444; border-color: #552222; }
+        .upload-section { margin-top: 30px; border-top: 1px solid #333; padding-top: 20px; }
+        #status { font-size: 0.8em; color: #888; margin-top: 5px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>My Music Library</h1>
 
-        <div class="upload-section">
-            <input type="file" id="videoInput" accept="video/mp4">
-            <button id="convertBtn" disabled>MP3に変換してライブラリへ</button>
-            <p id="status">動画ファイルを選択してください</p>
-        </div>
-
-        <div class="player-card">
-            <audio id="mainAudio" controls></audio>
-            <div class="controls-grid">
-                <button id="prevBtn">◀︎◀︎</button>
-                <button id="nextBtn">▶︎▶︎</button>
-                <button id="shuffleBtn" style="font-size: 0.8rem;">シャッフルOFF</button>
-            </div>
-            <p id="nowPlaying">再生中: なし</p>
-        </div>
-
-        <div class="playlist-header">保存済みプレイリスト</div>
-        <div id="playlist">
-            </div>
+<div class="player-container">
+    <h2>Music Player</h2>
+    
+    <div class="marquee-container">
+        <div id="nowPlaying" class="marquee">再生中: なし</div>
     </div>
 
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-    <script src="script.js"></script>
+    <audio id="mainAudio" controls></audio>
+
+    <div class="controls">
+        <button id="prevBtn">◀︎◀︎</button>
+        <button id="nextBtn">▶︎▶︎</button>
+    </div>
+
+    <div class="extra-controls">
+        <button id="shuffleBtn">シャッフル OFF</button>
+    </div>
+
+    <div class="playlist" id="playlist">
+        </div>
+
+    <div class="upload-section">
+        <input type="file" id="videoInput" accept="audio/*,video/*">
+        <button id="convertBtn" disabled>ライブラリに追加</button>
+        <p id="status"></p>
+    </div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>

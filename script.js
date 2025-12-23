@@ -32,37 +32,35 @@ async function loadPlaylistFromDB() {
     };
 }
 
-// --- 3. 【最速】待たせない保存 ---
+// --- 3. 【シンプル最短】動画をそのまま保存 ---
 document.getElementById('videoInput').onchange = (e) => {
     document.getElementById('convertBtn').disabled = !e.target.files[0];
 };
 
-document.getElementById('convertBtn').onclick = async () => {
+document.getElementById('convertBtn').onclick = () => {
     const file = document.getElementById('videoInput').files[0];
     if (!file) return;
 
     const status = document.getElementById('status');
-    status.textContent = "追加中..."; // 「保存中」ではなく「追加中」
+    status.textContent = "保存中...";
     document.getElementById('convertBtn').disabled = true;
 
-    const songName = file.name.replace(/\.[^/.]+$/, ""); 
-
-    // ★改善ポイント：IndexedDBへの保存を待たずに、先にリストを更新してしまう
+    // 前回の「爆速版」と同じく、一切の変換をせず動画をそのまま入れる
     const transaction = db.transaction(["songs"], "readwrite");
     const store = transaction.objectStore("songs");
-    
-    // 書き込み開始
+    const songName = file.name.replace(/\.[^/.]+$/, ""); 
+
     const addRequest = store.add({ name: songName, data: file });
 
-    // 書き込みが終わるのを待たずに、UIを「完了」っぽく見せる
-    setTimeout(() => {
-        status.textContent = "ライブラリに追加しました！";
+    // 完了したら即座に表示を更新する
+    addRequest.onsuccess = () => {
+        status.textContent = "完了！";
         document.getElementById('convertBtn').disabled = false;
-        loadPlaylistFromDB(); // 裏で終わった頃にリストを更新
-    }, 500); // 0.5秒でボタンを戻す
+        loadPlaylistFromDB(); // 保存が終わった瞬間にリストを出し直す
+    };
 
     addRequest.onerror = () => {
-        status.textContent = "エラーが発生しました";
+        status.textContent = "保存エラー";
         document.getElementById('convertBtn').disabled = false;
     };
 };
@@ -92,7 +90,7 @@ function playTrack(index) {
     if (index < 0 || index >= playlist.length) return;
     currentIndex = index;
     audio.src = playlist[index].url;
-    audio.play().catch(e => console.log("再生エラー:", e));
+    audio.play().catch(e => console.error("再生エラー:", e));
     document.getElementById('nowPlaying').textContent = `再生中: ${playlist[index].name}`;
     
     if ('mediaSession' in navigator) {
@@ -101,7 +99,7 @@ function playTrack(index) {
     renderPlaylist();
 }
 
-// --- 6. 曲名変更・削除・制御（変更なし） ---
+// --- 6. 曲名変更・削除・制御 ---
 function renameTrack(id) {
     const newName = prompt("新しい曲名を入力してください");
     if (!newName) return;

@@ -1,104 +1,103 @@
 const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({ log: true });
+const ffmpeg = createFFmpeg({ log: false });
 
-const videoInput = document.getElementById('videoInput');
-const convertBtn = document.getElementById('convertBtn');
-const status = document.getElementById('status');
-const mainAudio = document.getElementById('mainAudio');
-const playlistElement = document.getElementById('playlist');
-const nowPlayingText = document.getElementById('nowPlaying');
-const shuffleBtn = document.getElementById('shuffleBtn');
+let db;
+let playlist = [];
+let currentIndex = -1;
+let isShuffle = false;
 
-let playlist = []; // 曲のリスト
-let currentIndex = -1; // 今何曲目か
-let isShuffle = false; // シャッフルモード
+const audio = document.getElementById('mainAudio');
 
-// 1. ファイル選択
-videoInput.addEventListener('change', (e) => {
-    if (e.target.files[0]) {
-        convertBtn.disabled = false;
-        status.textContent = "変換の準備ができました！";
-    }
-});
+// --- 1. データベース(IndexedDB)の準備 ---
+const request = indexedDB.open("MusicData", 1);
+request.onupgradeneeded = (e) => {
+    db = e.target.result;
+    db.createObjectStore("songs", { keyPath: "id", autoIncrement: true });
+};
+request.onsuccess = (e) => {
+    db = e.target.result;
+    loadPlaylistFromDB(); // 起動時に保存された曲を読み込む
+};
 
-// 2. 変換とリスト追加
-convertBtn.addEventListener('click', async () => {
-    const file = videoInput.files[0];
-    if (!file) return;
-
-    status.textContent = "MP3を作成中...";
-    convertBtn.disabled = true;
-
-    if (!ffmpeg.isLoaded()) await ffmpeg.load();
-    ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(file));
-    await ffmpeg.run('-i', 'input.mp4', 'output.mp3');
-    const data = ffmpeg.FS('readFile', 'output.mp3');
-
-    // MP3のURLを作成
-    const mp3Url = URL.createObjectURL(new Blob([data.buffer], { type: 'audio/mp3' }));
-    
-    // リストに曲情報を追加
-    const track = {
-        name: file.name.replace('.mp4', ''),
-        url: mp3Url
+// --- 2. データベースから曲を読み込む ---
+async function loadPlaylistFromDB() {
+    const transaction = db.transaction(["songs"], "readonly");
+    const store = transaction.objectStore("songs");
+    const request = store.getAll();
+    request.onsuccess = () => {
+        playlist = request.result.map(song => ({
+            id: song.id,
+            name: song.name,
+            url: URL.createObjectURL(song.data) // 保存されたデータを再生用URLに変換
+        }));
+        renderPlaylist();
     };
-    playlist.push(track);
-    
-    renderPlaylist(); // 画面を更新
-    status.textContent = "リストに追加しました！";
-    convertBtn.disabled = false;
-
-    // もし何も再生していなければ、今追加した曲を再生
-    if (currentIndex === -1) {
-        playTrack(playlist.length - 1);
-    }
-});
-
-// 3. プレイリストを画面に表示
-function renderPlaylist() {
-    playlistElement.innerHTML = '';
-    playlist.forEach((track, index) => {
-        const div = document.createElement('div');
-        div.className = `track-item ${index === currentIndex ? 'active' : ''}`;
-        div.innerHTML = `<span>${index + 1}. ${track.name}</span>`;
-        div.onclick = () => playTrack(index);
-        playlistElement.appendChild(div);
-    });
 }
 
-// 4. 指定した番号の曲を再生
+// --- 3. 変換と保存 ---
+document.getElementById('convertBtn').onclick = async () => {
+    const file = document.getElementById('videoInput').files[0];
+    if (!file) return;
+
+    document.getElementById('status').textContent = "スマホで変換中...（少し時間がかかります）";
+    if (!ffmpeg.isLoaded()) await ffmpeg.load();
+
+    ffmpeg.FS('writeFile', 'in.mp4', await fetchFile(file));
+    await ffmpeg.run('-i', 'in.mp4', 'out.mp3');
+    const data = ffmpeg.FS('readFile', 'out.mp3');
+    const mp3Blob = new Blob([data.buffer], { type: 'audio/mp3' });
+
+    // データベースに保存
+    const transaction = db.transaction(["songs"], "readwrite");
+    const store = transaction.objectStore("songs");
+    const songName = file.name.replace(/\.[^/.]+$/, ""); // .mp4を消す
+    store.add({ name: songName, data: mp3Blob });
+
+    transaction.oncomplete = () => {
+        loadPlaylistFromDB(); // 保存が終わったらリストを更新
+        document.getElementById('status').textContent = "保存完了！";
+    };
+};
+
+// --- 4. 再生機能 & スマホのロック画面連携 ---
 function playTrack(index) {
     if (index < 0 || index >= playlist.length) return;
     currentIndex = index;
-    mainAudio.src = playlist[index].url;
-    mainAudio.play();
-    nowPlayingText.textContent = `再生中: ${playlist[index].name}`;
+    const track = playlist[index];
+    audio.src = track.url;
+    audio.play();
+
+    // ロック画面に情報を出す（Media Session API）
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.name,
+            artist: "My Music Player"
+        });
+    }
     renderPlaylist();
 }
 
-// 5. 連続再生（曲が終わったら次へ）
-mainAudio.onended = () => {
-    playNext();
-};
-
-function playNext() {
-    if (isShuffle) {
-        let nextIndex = Math.floor(Math.random() * playlist.length);
-        playTrack(nextIndex);
-    } else {
-        let nextIndex = (currentIndex + 1) % playlist.length;
-        playTrack(nextIndex);
-    }
+function renderPlaylist() {
+    const list = document.getElementById('playlist');
+    list.innerHTML = '';
+    playlist.forEach((track, i) => {
+        const item = document.createElement('div');
+        item.className = `track-item ${i === currentIndex ? 'active' : ''}`;
+        item.innerHTML = `<div>${track.name}</div>`;
+        item.onclick = () => playTrack(i);
+        list.appendChild(item);
+    });
 }
 
-// 6. 各種ボタンの動作
-document.getElementById('nextBtn').onclick = () => playNext();
-document.getElementById('prevBtn').onclick = () => {
-    let prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
-    playTrack(prevIndex);
+// 自動再生
+audio.onended = () => {
+    let next = isShuffle ? Math.floor(Math.random() * playlist.length) : (currentIndex + 1) % playlist.length;
+    playTrack(next);
 };
-shuffleBtn.onclick = () => {
+
+// ボタン操作
+document.getElementById('nextBtn').onclick = () => audio.onended();
+document.getElementById('shuffleBtn').onclick = (e) => {
     isShuffle = !isShuffle;
-    shuffleBtn.textContent = `シャッフル: ${isShuffle ? 'ON' : 'OFF'}`;
-    shuffleBtn.style.background = isShuffle ? '#1db954' : '#555';
+    e.target.textContent = `シャッフル: ${isShuffle ? 'ON' : 'OFF'}`;
 };

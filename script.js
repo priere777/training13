@@ -1,6 +1,3 @@
-const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({ log: false });
-
 let db;
 let playlist = [];
 let currentIndex = -1;
@@ -8,17 +5,7 @@ let isShuffle = false;
 
 const audio = document.getElementById('mainAudio');
 
-// --- 0. サイトを開いた瞬間にffmpegを準備しておく (先読み) ---
-(async () => {
-    try {
-        await ffmpeg.load();
-        console.log("FFmpeg準備完了！");
-    } catch (e) {
-        console.error("FFmpeg読み込みエラー:", e);
-    }
-})();
-
-// --- 1. データベースの準備 ---
+// --- 1. データベース(IndexedDB)の準備 ---
 const request = indexedDB.open("MusicData", 1);
 request.onupgradeneeded = (e) => {
     db = e.target.result;
@@ -45,7 +32,7 @@ async function loadPlaylistFromDB() {
     };
 }
 
-// --- 3. 【真・爆速】音の抜き出し ---
+// --- 3. 【究極の高速化】ffmpegを使わず直接保存 ---
 document.getElementById('videoInput').onchange = (e) => {
     document.getElementById('convertBtn').disabled = !e.target.files[0];
 };
@@ -55,18 +42,12 @@ document.getElementById('convertBtn').onclick = async () => {
     if (!file) return;
 
     const status = document.getElementById('status');
-    status.textContent = "抽出中...";
+    status.textContent = "保存中...";
     document.getElementById('convertBtn').disabled = true;
 
-    // 読み込みを高速化するための処理
-    const fileData = await fetchFile(file);
-    ffmpeg.FS('writeFile', 'in.mp4', fileData);
-    
-    // '-vn' (映像を捨てる) を最初に持ってきて、最速で音だけコピー
-    await ffmpeg.run('-i', 'in.mp4', '-vn', '-acodec', 'copy', 'out.m4a');
-    
-    const data = ffmpeg.FS('readFile', 'out.m4a');
-    const audioBlob = new Blob([data.buffer], { type: 'audio/mp4' });
+    // 動画ファイルをそのまま保存用のデータ（Blob）として扱う
+    // これにより変換待ち時間が「ゼロ」になります
+    const audioBlob = file; 
 
     const transaction = db.transaction(["songs"], "readwrite");
     const store = transaction.objectStore("songs");
@@ -75,11 +56,8 @@ document.getElementById('convertBtn').onclick = async () => {
 
     transaction.oncomplete = () => {
         loadPlaylistFromDB();
-        status.textContent = "追加完了！";
+        status.textContent = "完了！";
         document.getElementById('convertBtn').disabled = false;
-        // 使い終わったメモリを掃除
-        ffmpeg.FS('unlink', 'in.mp4');
-        ffmpeg.FS('unlink', 'out.m4a');
     };
 };
 

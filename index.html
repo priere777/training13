@@ -5,13 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Music Player</title>
     <style>
-        /* 全体のベース */
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #121212; color: #e0e0e0; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
         .player-container { width: 100%; max-width: 400px; text-align: center; }
-        
         h2 { color: #1DB954; font-size: 1.1rem; margin-bottom: 15px; letter-spacing: 1px; }
 
-        /* テロップの設定 */
         .marquee-container {
             width: 100%;
             overflow: hidden;
@@ -35,27 +32,18 @@
             100% { transform: translateX(-200%); }
         }
 
-        /* 再生バー（iPhoneで見やすいように色調整） */
         audio { width: 100%; margin: 15px 0; filter: invert(100%) hue-rotate(100deg) brightness(1.5); }
-        
-        /* ボタンを1行に配置 */
         .controls { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 25px; }
-        
         button { background: #282828; color: white; border: 1px solid #444; padding: 12px 5px; border-radius: 25px; cursor: pointer; transition: 0.2s; font-weight: bold; font-size: 0.85rem; flex: 1; max-width: 110px; }
         button:active { background: #1DB954; color: black; transform: scale(0.95); }
         
-        /* プレイリスト表示部 */
         .playlist { width: 100%; max-width: 400px; text-align: left; background: #181818; border-radius: 12px; padding: 5px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .track-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #282828; }
-        
-        /* 再生中の装飾 */
         .track-item.active { background: #232323; border-left: 4px solid #1DB954; }
         .track-item.active .track-name { color: #1DB954; font-weight: bold; }
-        
         .track-info { flex: 1; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .delete-btn { color: #666; background: none; border: none; font-size: 0.7rem; flex: 0; min-width: 40px; }
         
-        /* アップロードセクション */
         .upload-section { margin-top: 40px; border-top: 1px solid #333; padding-top: 20px; width: 100%; }
         #status { font-size: 0.8em; color: #1DB954; margin: 10px 0; }
         input[type="file"] { color: #888; font-size: 0.8rem; margin-bottom: 15px; }
@@ -65,29 +53,23 @@
 <body>
 
 <div class="player-container">
-    <h2>MY LIBRARY</h2>
-    
+    <h2>MY PRIVATE LIBRARY</h2>
     <div class="marquee-container">
         <div id="nowPlaying" class="marquee">再生中: なし</div>
     </div>
-
     <audio id="mainAudio" controls></audio>
-
     <div class="controls">
-        <button id="prevBtn">◀︎◀︎</button>
+        <button id="prevBtn">PREV</button>
         <button id="shuffleBtn">SHUFFLE OFF</button>
-        <button id="nextBtn">▶︎▶︎</button>
+        <button id="nextBtn">NEXT</button>
     </div>
-
     <div class="playlist" id="playlist"></div>
-
     <div class="upload-section">
-        <input type="file" id="videoInput" accept="audio/*,video/*">
-        <button id="convertBtn" disabled>Add To Library</button>
+        <input type="file" id="videoInput" accept="*/*">
+        <button id="convertBtn" disabled>ADD TO LIBRARY</button>
         <p id="status"></p>
     </div>
 </div>
-
 <script src="script.js"></script>
 </body>
 </html>

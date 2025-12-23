@@ -32,7 +32,7 @@ async function loadPlaylistFromDB() {
     };
 }
 
-// --- 3. 【シンプル最短】動画をそのまま保存 ---
+// --- 3. 保存処理（最短ルート版） ---
 document.getElementById('videoInput').onchange = (e) => {
     document.getElementById('convertBtn').disabled = !e.target.files[0];
 };
@@ -45,23 +45,16 @@ document.getElementById('convertBtn').onclick = () => {
     status.textContent = "保存中...";
     document.getElementById('convertBtn').disabled = true;
 
-    // 前回の「爆速版」と同じく、一切の変換をせず動画をそのまま入れる
     const transaction = db.transaction(["songs"], "readwrite");
     const store = transaction.objectStore("songs");
     const songName = file.name.replace(/\.[^/.]+$/, ""); 
 
     const addRequest = store.add({ name: songName, data: file });
 
-    // 完了したら即座に表示を更新する
     addRequest.onsuccess = () => {
         status.textContent = "完了！";
         document.getElementById('convertBtn').disabled = false;
-        loadPlaylistFromDB(); // 保存が終わった瞬間にリストを出し直す
-    };
-
-    addRequest.onerror = () => {
-        status.textContent = "保存エラー";
-        document.getElementById('convertBtn').disabled = false;
+        loadPlaylistFromDB();
     };
 };
 
@@ -85,13 +78,16 @@ function renderPlaylist() {
     });
 }
 
-// --- 5. 再生処理 ---
+// --- 5. 再生処理（テロップ演出付き） ---
 function playTrack(index) {
     if (index < 0 || index >= playlist.length) return;
     currentIndex = index;
     audio.src = playlist[index].url;
-    audio.play().catch(e => console.error("再生エラー:", e));
-    document.getElementById('nowPlaying').textContent = `再生中: ${playlist[index].name}`;
+    audio.play().catch(e => console.error(e));
+
+    // ★テロップ（流れる文字）の演出
+    const nowPlaying = document.getElementById('nowPlaying');
+    nowPlaying.innerHTML = `<div class="marquee"><span>再生中: ${playlist[index].name}</span></div>`;
     
     if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({ title: playlist[index].name });
@@ -99,7 +95,7 @@ function playTrack(index) {
     renderPlaylist();
 }
 
-// --- 6. 曲名変更・削除・制御 ---
+// --- 6. その他制御 ---
 function renameTrack(id) {
     const newName = prompt("新しい曲名を入力してください");
     if (!newName) return;

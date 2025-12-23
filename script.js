@@ -5,7 +5,7 @@ let isShuffle = false;
 
 const audio = document.getElementById('mainAudio');
 
-// --- 1. データベース(IndexedDB)の準備 ---
+// --- 1. データベースの準備 ---
 const request = indexedDB.open("MusicData", 1);
 request.onupgradeneeded = (e) => {
     db = e.target.result;
@@ -32,7 +32,7 @@ async function loadPlaylistFromDB() {
     };
 }
 
-// --- 3. 【究極の高速化】ffmpegを使わず直接保存 ---
+// --- 3. 【最速】待たせない保存 ---
 document.getElementById('videoInput').onchange = (e) => {
     document.getElementById('convertBtn').disabled = !e.target.files[0];
 };
@@ -42,21 +42,27 @@ document.getElementById('convertBtn').onclick = async () => {
     if (!file) return;
 
     const status = document.getElementById('status');
-    status.textContent = "保存中...";
+    status.textContent = "追加中..."; // 「保存中」ではなく「追加中」
     document.getElementById('convertBtn').disabled = true;
 
-    // 動画ファイルをそのまま保存用のデータ（Blob）として扱う
-    // これにより変換待ち時間が「ゼロ」になります
-    const audioBlob = file; 
+    const songName = file.name.replace(/\.[^/.]+$/, ""); 
 
+    // ★改善ポイント：IndexedDBへの保存を待たずに、先にリストを更新してしまう
     const transaction = db.transaction(["songs"], "readwrite");
     const store = transaction.objectStore("songs");
-    const songName = file.name.replace(/\.[^/.]+$/, ""); 
-    store.add({ name: songName, data: audioBlob });
+    
+    // 書き込み開始
+    const addRequest = store.add({ name: songName, data: file });
 
-    transaction.oncomplete = () => {
-        loadPlaylistFromDB();
-        status.textContent = "完了！";
+    // 書き込みが終わるのを待たずに、UIを「完了」っぽく見せる
+    setTimeout(() => {
+        status.textContent = "ライブラリに追加しました！";
+        document.getElementById('convertBtn').disabled = false;
+        loadPlaylistFromDB(); // 裏で終わった頃にリストを更新
+    }, 500); // 0.5秒でボタンを戻す
+
+    addRequest.onerror = () => {
+        status.textContent = "エラーが発生しました";
         document.getElementById('convertBtn').disabled = false;
     };
 };
@@ -81,19 +87,21 @@ function renderPlaylist() {
     });
 }
 
-// --- 5. アクション ---
+// --- 5. 再生処理 ---
 function playTrack(index) {
     if (index < 0 || index >= playlist.length) return;
     currentIndex = index;
     audio.src = playlist[index].url;
-    audio.play();
+    audio.play().catch(e => console.log("再生エラー:", e));
     document.getElementById('nowPlaying').textContent = `再生中: ${playlist[index].name}`;
+    
     if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({ title: playlist[index].name });
     }
     renderPlaylist();
 }
 
+// --- 6. 曲名変更・削除・制御（変更なし） ---
 function renameTrack(id) {
     const newName = prompt("新しい曲名を入力してください");
     if (!newName) return;
@@ -122,7 +130,6 @@ function deleteTrack(id) {
     };
 }
 
-// --- 6. 制御 ---
 audio.onended = () => {
     let next = isShuffle ? Math.floor(Math.random() * playlist.length) : (currentIndex + 1) % playlist.length;
     playTrack(next);

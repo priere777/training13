@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP4 to MP3 コンバーター</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; text-align: center; background-color: #f4f4f9; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; }
+        h1 { color: #333; }
+        #status { margin: 20px 0; font-weight: bold; color: #007bff; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        audio { margin-top: 20px; width: 100%; }
+        .download-link { display: inline-block; margin-top: 15px; color: #28a745; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MP4 → MP3</h1>
+        <p>動画から音を取り出してMP3を作ります</p>
+        
+        <input type="file" id="videoInput" accept="video/mp4">
+        <br><br>
+        <button id="convertBtn" disabled>MP3に変換する</button>
+        
+        <p id="status">ファイルを選択してください</p>
+
+        <div id="playerContainer"></div>
+    </div>
+
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

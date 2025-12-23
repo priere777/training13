@@ -52,7 +52,7 @@ document.getElementById('convertBtn').onclick = () => {
     const addRequest = store.add({ name: songName, data: file });
 
     addRequest.onsuccess = () => {
-        status.textContent = "完了！一瞬でした。";
+        status.textContent = "ファイル追加完了！";
         document.getElementById('convertBtn').disabled = false;
         loadPlaylistFromDB();
     };

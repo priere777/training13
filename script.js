@@ -81,7 +81,7 @@ function playTrack(index) {
     audio.src = playlist[index].url;
     audio.play().catch(e => console.error(e));
     const nowPlaying = document.getElementById('nowPlaying');
-    nowPlaying.textContent = `再生中: ${playlist[index].name}`;
+    nowPlaying.textContent = `PLAY NOW: ${playlist[index].name}`;
     if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({ title: playlist[index].name });
     }
